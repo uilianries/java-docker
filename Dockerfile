@@ -24,3 +24,6 @@ RUN pip install -q pexpect
 # Install Forticlient
 ADD https://hadler.me/files/forticlient-sslvpn_4.4.2329-1_amd64.deb /tmp
 RUN dpkg -i /tmp/forticlient-sslvpn_4.4.2329-1_amd64.deb
+COPY forticlient-auto /opt/forticlient-sslvpn/64bit/forticlient-auto
+COPY forticlient /etc/init.d/forticlient
+RUN update-rc.d forticlient defaults && update-rc.d forticlient enable
