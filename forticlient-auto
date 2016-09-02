@@ -1,0 +1,136 @@
+#!/usr/bin/python
+import os
+import pexpect
+import argparse
+import json
+import sys
+import time
+import signal
+from collections import namedtuple
+from os.path import join
+from os.path import isfile
+from os import access
+
+ConnectionData = namedtuple("ConnectionData", "username password server port")
+
+class FortiClient(object):
+    """Bind to fortclient_cli
+    """
+
+    __FORTICLIENT_PATH = join(os.sep, 'opt', 'forticlient-sslvpn', '64bit', 'forticlientsslvpn_cli')
+
+    def __path_validation(self):
+        """Execute process path validation
+        :return: None
+        """
+        if not isfile(FortiClient.__FORTICLIENT_PATH):
+            raise IOError('Could not find Forticlient app')
+        if not access(FortiClient.__FORTICLIENT_PATH, os.X_OK):
+            raise RuntimeError('Could not execute Forticlient: Permission denied')
+
+    def __init__(self, connection_data):
+        """Connect in VPN by Forticlient
+
+            If some unspected condition occurs,
+            an exception will be throwed.
+            :type connection_data: ConnectionData
+        """
+        self.__handle = None
+        self.__path_validation()
+        self.__connected = False
+        self.__connection_data = connection_data
+        self.__command_line = "%s --vpnuser %s --server %s:%s --keepalive" % (FortiClient.__FORTICLIENT_PATH,
+                                                                              connection_data.username,
+                                                                              connection_data.server,
+                                                                              connection_data.port)
+
+    def __del__(self):
+        """Clone VPN connection"""
+        if self.__connected:
+            self.disconnect()
+
+    def connect(self):
+        """Connect to VPN server
+        :return: Operation result. True if is connected
+        """
+        self.__handle = pexpect.spawn(self.__command_line)
+        self.__handle.expect("Password for VPN:", timeout=5)
+        self.__handle.sendline(self.__connection_data.password)
+        self.__handle.expect("Would you like to connect to this server?", timeout=5)
+        self.__handle.sendline('Y')
+        self.__handle.expect("STATUS::Login succeed", timeout=5)
+        self.__handle.expect("STATUS::Connected", timeout=5)
+        self.__handle.expect("STATUS::Tunnel running", timeout=5)
+        self.__connected = True
+        return self.__connected
+
+    def disconnect(self):
+        """Disconnect from the server
+        :return: None
+        """
+        if self.__connected:
+            self.__handle.send('\003')
+
+
+class Application(object):
+    """Run the VPN client
+    """
+
+    def __init__(self):
+        """Process user arguments
+        """
+        config_path = self.__parse_config_path()
+        self.__connection_data = self.__load_config_data(config_path)
+
+    def __parse_config_path(self):
+        """Parse line argument to capture the config file path
+        :return: config file path
+        """
+        config_path = join(os.sep, 'opt', 'forticlient-sslvpn', '64bit', 'forticlient.json')
+        parser = argparse.ArgumentParser(prog='forticlient-auto')
+        parser.add_argument('--config', help='Configuration file', default=config_path)
+        args = parser.parse_args()
+        return args.config
+
+    def __load_config_data(self, config_path):
+        """Load config file as a tuple
+
+        :param config_path: File path as json
+        :return: connection information as a tuple
+        """
+        config_file = open(config_path, 'r')
+        config_json = json.loads(config_file.read())
+        return ConnectionData(config_json['username'], config_json['password'], config_json['server'],
+                              config_json['port'])
+
+    def run(self):
+        """Connect to VPN server
+        :return: None
+        """
+        forticlient = FortiClient(self.__connection_data)
+        if not forticlient.connect():
+            print("Could not connect on VPN")
+            sys.exit(1)
+
+        print("Connected on VPN %s by user %s" % (self.__connection_data.server, self.__connection_data.username))
+
+        # TODO (uilian.ries) - There are more elegant options.
+        while True:
+            time.sleep(1)
+
+
+def signal_handler(signal, frame):
+    """Close program
+    :param signal: Signal id
+    :param frame: signal frame
+    :return: None
+    """
+    print("Good bye!")
+    sys.exit(0)
+
+
+if __name__ == "__main__":
+    signal.signal(signal.SIGINT, signal_handler)
+
+    app = Application()
+    app.run()
