@@ -6,16 +6,11 @@ MAINTAINER Uilian Ries <uilian.ries@cwi.com.br>
 RUN apt-get update && apt-get -qq -y install \
     apt-utils \
     build-essential \
-    curl \
-    apt-utils \
-    python-pip \
+    curl
 
-RUN curl -sL https://deb.nodesource.com/setup_4.x | bash - > /dev/null
-RUN apt-get -qq -y install nodejs > /dev/null
+RUN curl -sL https://deb.nodesource.com/setup_4.x | bash -
+RUN apt-get -qq -y install nodejs
 
 # Install npm packages
 RUN npm install -g bower
 RUN echo '{ "allow_root": true }' > /root/.bowerrc
-
-# Install pip packages
-RUN pip install -q pexpect
