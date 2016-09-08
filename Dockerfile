@@ -1,6 +1,6 @@
 FROM maven:3-jdk-8
 
-MAINTAINER Uilian Ries <uilian.ries@cwi.com.br>
+MAINTAINER Uilian Ries <uilian.ries@gmail.com>
 
 # Install apt packages
 RUN apt-get update && apt-get -qq -y install \
